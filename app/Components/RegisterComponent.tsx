@@ -104,7 +104,7 @@ export function RegisterComponent() {
 
             <div className="rounded-3xl border border-[#eadfd3] bg-white p-5 shadow-sm">
               <p className="text-sm text-[#8b5e3c]">Seguridad</p>
-              <p className="mt-2 text-lg font-semibold">Sesión con token</p>
+              <p className="mt-2 text-lg font-semibold">Pago seguro </p>
             </div>
           </div>
         </div>

@@ -3,7 +3,7 @@ import { Certification, Review, TeachingStep } from "../Interface/Home";
 export const reviews: Review[] = [
   {
     id: 1,
-    name: "Emily Carter",
+    name: "Nicole Otto",
     title: "Spanish conversation",
     country: "Estados Unidos",
     text: "Las clases con Carolina me ayudaron a perder el miedo a hablar. Ahora puedo mantener conversaciones mucho más fluidas y naturales.",
@@ -11,7 +11,7 @@ export const reviews: Review[] = [
   },
   {
     id: 2,
-    name: "Lucas Martin",
+    name: "Hanna Barlito",
     title: "Practice conversation",
     country: "Canadá",
     text: "Me gusta mucho que las clases son personalizadas. Practicamos temas reales y eso me ayuda bastante en mi día a día.",
@@ -19,7 +19,7 @@ export const reviews: Review[] = [
   },
   {
     id: 3,
-    name: "Sophie Laurent",
+    name: "Andres Apple",
     title: "Spanish and learn",
     country: "Francia",
     text: "Carolina explica con mucha paciencia y hace que aprender español sea un proceso muy agradable y dinámico.",
@@ -57,8 +57,8 @@ export const teachingSteps: TeachingStep[] = [
 export const certifications: Certification[] = [
   {
     id: 1,
-    title: "Certificación en Enseñanza de Español",
-    subtitle: "Instituto Internacional de Lenguas",
+    title: "Certificacion de Ingles",
+    subtitle: "EFSET",
   },
   {
     id: 2,
