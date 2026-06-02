@@ -1,44 +1,34 @@
 # Classora Frontend/Backend Integration
 
-## Phase 3 summary
+## Phase 4 summary
 
-Phase 3 connects the frontend to the real Classora-server API where the contracts already match closely. It avoids a full booking redesign and keeps temporary fallbacks where the backend/frontend contract still needs Phase 4 work.
+Phase 4 closes the main user flow with real backend data:
+
+Login -> view classes -> view real schedules -> select schedule -> create reservation -> view my reservations.
+
+No database changes were made and the booking screen kept the same visual structure where possible.
 
 ## API configuration
 
-Create a frontend `.env.local` using:
+Frontend local configuration:
 
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:3030
 ```
 
-An `.env.example` file is included with the same value.
+Files:
+
+- `.env.example` documents the required value.
+- `.env.local` is configured locally with `NEXT_PUBLIC_API_URL=http://localhost:3030` and remains ignored by git.
 
 ## Central API client
 
-Added `app/services/apiClient.ts`:
+`app/services/apiClient.ts` is the shared API layer:
 
 - Uses `NEXT_PUBLIC_API_URL`.
 - Sends `Content-Type: application/json`.
-- Sends `Authorization: Bearer <token>` when a token is provided.
-- Throws `ApiError` with status and API payload for clean error handling.
-
-## Mocks removed or replaced
-
-- Removed the auth mock file `mock/AuthMock.ts`.
-- `app/services/AuthServices.ts` now calls real backend endpoints:
-  - `POST /auth/login`
-  - `POST /auth/register`
-  - `GET /auth/me`
-- Lessons no longer use `utils/LessonData.ts` as the primary source.
-- `app/services/LessonServices.ts` now calls `GET /classes` and maps backend classes to the frontend `Lesson` shape.
-
-## What still uses fallback data
-
-- `utils/LessonData.ts` remains as a temporary fallback if `GET /classes` fails or returns no classes.
-- Lesson `price` is still local fallback data because Classora-server classes do not expose price yet.
-- `mock/BookingMock.ts` remains because the current booking UI still selects a free-form slot and does not yet submit a real `classScheduleId`.
-- `createBooking` still returns a temporary response. Real reservation submission is available through `createReservation(classScheduleId, token)` but the UI is not wired to it yet.
+- Sends `Authorization: Bearer <token>` when provided.
+- Throws `ApiError` with status and backend payload for cleaner UI error handling.
 
 ## Connected endpoints
 
@@ -55,7 +45,7 @@ Response mapping:
 - `user.profileImg` -> `user.avatar`
 - `STUDENT | TEACHER | ADMIN` -> `student | teacher | admin`
 
-### Lessons
+### Classes / Lessons
 
 - `GET /classes`
 
@@ -70,30 +60,48 @@ Class mapping:
 - `intensity` -> frontend level approximation
 - missing backend `price` -> temporary `$18 USD`
 
-### Booking preparation
-
-Real services were added for:
+### Booking / Reservations
 
 - `GET /class-schedules`
 - `POST /reservations?classScheduleId=...`
 - `GET /reservations/me`
 
-The existing booking UI is intentionally not redesigned in Phase 3.
+Booking now uses the authenticated user's JWT to load schedules, create reservations, and show the user's reservation history.
 
-## Phase 4 booking work
+## Mocks removed
 
-To complete booking against the real backend:
+- `mock/AuthMock.ts` was removed in Phase 3.
+- `mock/BookingMock.ts` was removed in Phase 4.
+- `BookingServices.createBooking` temporary mock flow was removed.
+- Available slots now come from `GET /class-schedules`.
 
-- Require login before reservation or pass the auth token into booking services.
-- Replace free-form slot mocks with real `classScheduleId` selection from `GET /class-schedules`.
-- Show class name, teacher, capacity/spaces, date, and time from backend schedules.
-- Submit `POST /reservations?classScheduleId=...` using the selected schedule id.
-- Replace the temporary `createBooking` response with the backend reservation response.
-- Decide whether backend should expose a public available-slots endpoint or keep schedules protected.
-- Add backend/frontend support for notes, timezone, and lesson type if those remain product requirements.
+## What still uses fallback data
 
-## Backend gaps observed during Phase 3
+- `utils/LessonData.ts` remains as a temporary fallback if `GET /classes` fails or returns no classes.
+- Lesson `price` remains a local fallback because Classora-server classes do not expose price yet.
 
-- `GET /class-schedules` is protected, so anonymous slot loading falls back locally until booking is authenticated or backend exposes public availability.
+## Booking behavior after Phase 4
+
+- Anonymous users see a login-required state for real schedules and reservations.
+- Authenticated users can select date/duration/timezone and load real class schedules.
+- Selecting a schedule stores its backend `classScheduleId`.
+- Submitting creates a reservation with `POST /reservations?classScheduleId=...`.
+- The left-side panel shows `GET /reservations/me` results with class, date, time, and status.
+- Empty, loading, and error states are shown for schedules and reservations.
+
+## Remaining product/backend gaps
+
+- Booking form fields `lessonType`, `level`, `timezone`, and `notes` are still frontend-only; the backend reservation endpoint currently only accepts `classScheduleId` through the query string.
+- The backend requires token balance for reservation. A new test student without tokens may receive a backend error until token seeding/payment flow is handled.
+- `GET /class-schedules` is protected, so users must log in before seeing availability.
+- Class schedule capacity/spaces still depend on the backend's current `spaces_available`/reservation calculations.
 - Classes do not expose price.
-- Reservations require `classScheduleId`; the current UI does not model that yet.
+
+## Needed for a private beta
+
+- Seed real teachers, classes, schedules, and at least one test student with enough token balance.
+- Confirm teacher/admin workflow for creating schedules.
+- Add a simple operational checklist for cancelling schedules and handling failed reservations.
+- Decide how students receive credits/tokens during beta.
+- Add basic smoke tests for login, class listing, schedule listing, reservation creation, and reservation history.
+- Verify production environment variables and CORS for the deployed frontend URL.

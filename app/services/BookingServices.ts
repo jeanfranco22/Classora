@@ -1,23 +1,79 @@
 import {
   BackendClassSchedule,
   BackendReservation,
-  BookingPayload,
-  BookingResponse,
   CreateReservationResponse,
   GetAvailableSlotsParams,
   TimeSlot,
 } from "../../Interface/BookingInterface";
-import { mockAvailableSlots } from "../../mock/BookingMock";
 import { apiClient } from "./apiClient";
 
+function normalizeDate(date: string) {
+  return date?.split("T")[0];
+}
+
+function addMinutes(time: string, minutes: number) {
+  const [hours = "0", mins = "0"] = time.split(":");
+  const date = new Date();
+  date.setHours(Number(hours), Number(mins), 0, 0);
+  date.setMinutes(date.getMinutes() + minutes);
+
+  return `${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`;
+}
+
+function getScheduleDuration(schedule: BackendClassSchedule, fallback: number) {
+  const duration = Number.parseInt(schedule.class?.duration || "", 10);
+  return Number.isFinite(duration) ? duration : fallback;
+}
+
+export function mapScheduleToTimeSlot(
+  schedule: BackendClassSchedule,
+  fallbackDuration: number,
+): TimeSlot {
+  const duration = getScheduleDuration(schedule, fallbackDuration);
+  const spacesAvailable = schedule.spaces_available ?? null;
+
+  return {
+    id: schedule.id,
+    label: `${schedule.time} - ${schedule.class?.name || "Clase"}`,
+    startTime: schedule.time,
+    endTime: addMinutes(schedule.time, duration),
+    available: schedule.isActive && (spacesAvailable === null || spacesAvailable > 0),
+    className: schedule.class?.name || "Clase de español",
+    teacherName: schedule.teacher?.name || schedule.coach?.name || "Profesor por asignar",
+    spacesAvailable,
+  };
+}
+
 export async function getClassSchedules(
-  token?: string | null,
+  token: string,
 ): Promise<BackendClassSchedule[]> {
   return apiClient<BackendClassSchedule[]>("/class-schedules", {
     method: "GET",
     token,
     cache: "no-store",
   });
+}
+
+export async function getAvailableSlots(
+  params: GetAvailableSlotsParams,
+  token: string,
+): Promise<TimeSlot[]> {
+  const schedules = await getClassSchedules(token);
+
+  return schedules
+    .filter((schedule) => {
+      const scheduleDate = normalizeDate(schedule.date);
+      const duration = getScheduleDuration(schedule, params.duration);
+
+      return (
+        schedule.isActive &&
+        scheduleDate === params.date &&
+        (!params.duration || duration === params.duration)
+      );
+    })
+    .map((schedule) => mapScheduleToTimeSlot(schedule, params.duration));
 }
 
 export async function createReservation(
@@ -41,54 +97,4 @@ export async function getMyReservations(
     token,
     cache: "no-store",
   });
-}
-
-export async function getAvailableSlots(
-  params: GetAvailableSlotsParams,
-): Promise<TimeSlot[]> {
-  try {
-    const schedules = await getClassSchedules();
-    const filteredSchedules = schedules.filter((schedule) => {
-      const scheduleDate = schedule.date?.split("T")[0];
-      const duration = Number(schedule.class?.duration || params.duration);
-
-      return (
-        schedule.isActive &&
-        scheduleDate === params.date &&
-        (!params.duration || duration === params.duration)
-      );
-    });
-
-    if (filteredSchedules.length) {
-      return filteredSchedules.map((schedule) => ({
-        id: schedule.id,
-        label: schedule.time,
-        startTime: schedule.time,
-        endTime: schedule.time,
-        available: (schedule.spaces_available ?? 1) > 0,
-      }));
-    }
-  } catch (error) {
-    console.error("Error loading backend class schedules, using slot fallback:", error);
-  }
-
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  return mockAvailableSlots.filter((slot) => slot.available);
-}
-
-export async function createBooking(
-  payload: BookingPayload,
-): Promise<BookingResponse> {
-  console.log(
-    "Booking payload pending classScheduleId mapping for Phase 4:",
-    payload,
-  );
-
-  await new Promise((resolve) => setTimeout(resolve, 700));
-
-  return {
-    success: true,
-    bookingId: `BOOK-${Date.now()}`,
-    message: "Reserva preparada. Falta seleccionar classScheduleId real para enviarla al backend.",
-  };
 }

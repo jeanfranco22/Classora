@@ -24,31 +24,15 @@ export interface TimeSlot {
   startTime: string;
   endTime: string;
   available: boolean;
+  className: string;
+  teacherName: string;
+  spacesAvailable: number | null;
 }
 
 export interface GetAvailableSlotsParams {
   date: string;
   duration: number;
   timezone: string;
-}
-
-export interface BookingPayload {
-  studentName: string;
-  studentEmail: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  lessonType: LessonType;
-  level: LessonLevel;
-  duration: number;
-  timezone: string;
-  notes?: string;
-}
-
-export interface BookingResponse {
-  success: boolean;
-  bookingId: string;
-  message: string;
 }
 
 export interface BackendClassSchedule {

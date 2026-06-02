@@ -2,14 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  BackendReservation,
   BookingFormData,
-  BookingPayload,
-  BookingResponse,
   LessonLevel,
   LessonType,
   TimeSlot,
 } from "../../Interface/BookingInterface";
-import { createBooking, getAvailableSlots } from "../services/BookingServices";
+import { useAuth } from "../../hooks/useAuth";
+import {
+  createReservation,
+  getAvailableSlots,
+  getMyReservations,
+} from "../services/BookingServices";
 
 const lessonTypes: LessonType[] = [
   "Conversación",
@@ -34,22 +38,90 @@ const initialForm: BookingFormData = {
   notes: "",
 };
 
+function formatDate(date?: string) {
+  if (!date) return "Fecha no disponible";
+
+  return new Intl.DateTimeFormat("es-MX", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+  }).format(new Date(date));
+}
+
+function getReservationClassName(reservation: BackendReservation) {
+  return reservation.class_schedule?.class?.name || "Clase de español";
+}
+
+function getReservationDate(reservation: BackendReservation) {
+  return reservation.class_schedule?.date || reservation.date;
+}
+
 export function BookingComponent() {
+  const { dataUser } = useAuth();
   const [form, setForm] = useState<BookingFormData>(initialForm);
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string>("");
+  const [reservations, setReservations] = useState<BackendReservation[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [loadingReservations, setLoadingReservations] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [reservationsError, setReservationsError] = useState<string>("");
+
+  const token = dataUser.token;
+  const user = dataUser.user;
+  const isAuthenticated = dataUser.isAuthenticated && Boolean(token);
 
   const canFetchSlots = useMemo(() => {
-    return Boolean(form.date && form.duration && form.timezone);
-  }, [form.date, form.duration, form.timezone]);
+    return Boolean(isAuthenticated && form.date && form.duration && form.timezone);
+  }, [form.date, form.duration, form.timezone, isAuthenticated]);
+
+  const loadReservations = async () => {
+    if (!token) {
+      setReservations([]);
+      return;
+    }
+
+    try {
+      setLoadingReservations(true);
+      setReservationsError("");
+
+      const data = await getMyReservations(token);
+      setReservations(data);
+    } catch (err) {
+      console.error(err);
+      setReservationsError("No se pudieron cargar tus reservaciones.");
+    } finally {
+      setLoadingReservations(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+
+    setForm((prev) => ({
+      ...prev,
+      studentName: prev.studentName || user.fullName,
+      studentEmail: prev.studentEmail || user.email,
+    }));
+  }, [user]);
+
+  useEffect(() => {
+    void loadReservations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   useEffect(() => {
     const loadSlots = async () => {
-      if (!canFetchSlots) {
+      if (!isAuthenticated) {
+        setSlots([]);
+        setSelectedSlot("");
+        setError("Inicia sesión para ver horarios disponibles.");
+        return;
+      }
+
+      if (!canFetchSlots || !token) {
         setSlots([]);
         setSelectedSlot("");
         return;
@@ -60,16 +132,24 @@ export function BookingComponent() {
         setError("");
         setMessage("");
 
-        const data = await getAvailableSlots({
-          date: form.date,
-          duration: form.duration,
-          timezone: form.timezone,
-        });
+        const data = await getAvailableSlots(
+          {
+            date: form.date,
+            duration: form.duration,
+            timezone: form.timezone,
+          },
+          token,
+        );
 
         setSlots(data);
         setSelectedSlot("");
+
+        if (!data.length) {
+          setError("No hay horarios disponibles para esa fecha y duración.");
+        }
       } catch (err) {
         console.error(err);
+        setSlots([]);
         setError("No se pudieron cargar los horarios disponibles.");
       } finally {
         setLoadingSlots(false);
@@ -77,7 +157,7 @@ export function BookingComponent() {
     };
 
     loadSlots();
-  }, [canFetchSlots, form.date, form.duration, form.timezone]);
+  }, [canFetchSlots, form.date, form.duration, form.timezone, isAuthenticated, token]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -93,6 +173,7 @@ export function BookingComponent() {
   };
 
   const validateForm = () => {
+    if (!isAuthenticated || !token) return "Inicia sesión para reservar una clase.";
     if (!form.studentName.trim()) return "El nombre es obligatorio.";
     if (!form.studentEmail.trim()) return "El correo es obligatorio.";
     if (!/\S+@\S+\.\S+/.test(form.studentEmail)) {
@@ -100,6 +181,9 @@ export function BookingComponent() {
     }
     if (!form.date) return "Selecciona una fecha.";
     if (!selectedSlot) return "Selecciona un horario disponible.";
+
+    const slot = slots.find((item) => item.id === selectedSlot);
+    if (!slot || !slot.available) return "El horario no está disponible.";
 
     return "";
   };
@@ -116,40 +200,32 @@ export function BookingComponent() {
       return;
     }
 
-    const slot = slots.find((item) => item.id === selectedSlot);
-    if (!slot) {
-      setError("El horario seleccionado ya no está disponible.");
-      return;
-    }
-
-    const payload: BookingPayload = {
-      studentName: form.studentName.trim(),
-      studentEmail: form.studentEmail.trim(),
-      date: form.date,
-      startTime: slot.startTime,
-      endTime: slot.endTime,
-      lessonType: form.lessonType,
-      level: form.level,
-      duration: form.duration,
-      timezone: form.timezone,
-      notes: form.notes.trim(),
-    };
+    if (!token) return;
 
     try {
       setSubmitting(true);
 
-      const response: BookingResponse = await createBooking(payload);
+      const response = await createReservation(selectedSlot, token);
 
       setMessage(
-        `Clase reservada con éxito. Referencia: ${response.bookingId}`,
+        `Reserva exitosa. Referencia: ${response.reservation_id}`,
       );
 
-      setForm(initialForm);
+      setForm({
+        ...initialForm,
+        studentName: user?.fullName || "",
+        studentEmail: user?.email || "",
+      });
       setSlots([]);
       setSelectedSlot("");
+      await loadReservations();
     } catch (err) {
       console.error(err);
-      setError("No fue posible completar la reserva. Intenta de nuevo.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No fue posible completar la reserva. Intenta de nuevo.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -170,9 +246,8 @@ export function BookingComponent() {
 
             <p className="max-w-2xl text-base leading-8 text-[#6b625b] md:text-lg">
               Elige el tipo de clase, tu nivel y el horario que mejor se adapte
-              a ti. La experiencia está preparada para conectarse fácilmente con
-              tu backend cuando quieras integrar disponibilidad real, pagos y
-              confirmaciones automáticas.
+              a ti. Los horarios y reservaciones se sincronizan con el backend
+              de Classora.
             </p>
           </div>
 
@@ -194,13 +269,38 @@ export function BookingComponent() {
           </div>
 
           <div className="rounded-[28px] border border-[#eadfd3] bg-[#fff] p-6 shadow-sm">
-            <h2 className="text-xl font-semibold">¿Qué incluye la clase?</h2>
-            <ul className="mt-4 space-y-3 text-[#5f5852]">
-              <li>• Sesión adaptada a tu nivel y objetivos</li>
-              <li>• Práctica conversacional guiada</li>
-              <li>• Correcciones y recomendaciones personalizadas</li>
-              <li>• Espacio para notas o temas específicos</li>
-            </ul>
+            <h2 className="text-xl font-semibold">Mis reservaciones</h2>
+
+            <div className="mt-4 space-y-3 text-[#5f5852]">
+              {!isAuthenticated ? (
+                <p className="text-sm">Inicia sesión para ver tus reservaciones.</p>
+              ) : loadingReservations ? (
+                <p className="text-sm">Cargando reservaciones...</p>
+              ) : reservationsError ? (
+                <p className="text-sm text-red-600">{reservationsError}</p>
+              ) : reservations.length === 0 ? (
+                <p className="text-sm">Todavía no tienes reservaciones.</p>
+              ) : (
+                reservations.map((reservation) => (
+                  <div
+                    key={reservation.id}
+                    className="rounded-2xl border border-[#eadfd3] bg-[#fffdfb] p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium text-[#1d1d1d]">
+                        {getReservationClassName(reservation)}
+                      </p>
+                      <span className="rounded-full border border-[#dfd2c6] bg-white px-3 py-1 text-xs font-medium text-[#8b5e3c]">
+                        {reservation.status}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm">
+                      {formatDate(getReservationDate(reservation))} · {reservation.class_schedule?.time || "Horario no disponible"}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
 
@@ -342,6 +442,10 @@ export function BookingComponent() {
               <div className="rounded-2xl border border-[#eadfd3] bg-[#fffdfb] p-4">
                 {loadingSlots ? (
                   <p className="text-sm text-[#6b625b]">Cargando horarios...</p>
+                ) : !isAuthenticated ? (
+                  <p className="text-sm text-[#6b625b]">
+                    Inicia sesión para consultar horarios reales.
+                  </p>
                 ) : slots.length === 0 ? (
                   <p className="text-sm text-[#6b625b]">
                     Selecciona fecha, duración y zona horaria para ver
@@ -356,16 +460,23 @@ export function BookingComponent() {
                         <button
                           key={slot.id}
                           type="button"
+                          disabled={!slot.available}
                           onClick={() => setSelectedSlot(slot.id)}
-                          className={`rounded-2xl border px-4 py-3 text-left transition ${
+                          className={`rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
                             isSelected
                               ? "border-[#8b5e3c] bg-[#f8efe8]"
                               : "border-[#dfd2c6] bg-white hover:border-[#c7a88c]"
                           }`}
                         >
-                          <p className="font-medium">{slot.label}</p>
+                          <p className="font-medium">{slot.className}</p>
                           <p className="mt-1 text-sm text-[#6b625b]">
                             {slot.startTime} - {slot.endTime}
+                          </p>
+                          <p className="mt-1 text-xs text-[#8b5e3c]">
+                            {slot.teacherName}
+                            {slot.spacesAvailable !== null
+                              ? ` · ${slot.spacesAvailable} cupos`
+                              : ""}
                           </p>
                         </button>
                       );
@@ -404,7 +515,7 @@ export function BookingComponent() {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !isAuthenticated}
               className="w-full rounded-2xl bg-[#8b5e3c] px-5 py-4 font-medium text-white transition hover:bg-[#744b2d] disabled:cursor-not-allowed disabled:opacity-70"
             >
               {submitting ? "Reservando..." : "Confirmar reserva"}
