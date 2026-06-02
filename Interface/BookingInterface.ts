@@ -73,3 +73,15 @@ export interface CreateReservationResponse {
   message: string;
   reservation_id: string;
 }
+
+export interface BackendTeacherReservation {
+  id: string;
+  date: string;
+  status: string;
+  users?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  class_schedule?: BackendClassSchedule;
+}

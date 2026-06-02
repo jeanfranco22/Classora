@@ -1,6 +1,7 @@
 import {
   BackendClassSchedule,
   BackendReservation,
+  BackendTeacherReservation,
   CreateReservationResponse,
   GetAvailableSlotsParams,
   TimeSlot,
@@ -93,6 +94,16 @@ export async function getMyReservations(
   token: string,
 ): Promise<BackendReservation[]> {
   return apiClient<BackendReservation[]>("/reservations/me", {
+    method: "GET",
+    token,
+    cache: "no-store",
+  });
+}
+
+export async function getTeacherReservations(
+  token: string,
+): Promise<BackendTeacherReservation[]> {
+  return apiClient<BackendTeacherReservation[]>("/reservations/teacher/me", {
     method: "GET",
     token,
     cache: "no-store",
