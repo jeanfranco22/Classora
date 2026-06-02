@@ -1,58 +1,111 @@
 import {
-  BookingPayload,
-  BookingResponse,
+  BackendClassSchedule,
+  BackendReservation,
+  BackendTeacherReservation,
+  CreateReservationResponse,
   GetAvailableSlotsParams,
   TimeSlot,
 } from "../../Interface/BookingInterface";
-import { mockAvailableSlots } from "../../mock/BookingMock";
+import { apiClient } from "./apiClient";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+function normalizeDate(date: string) {
+  return date?.split("T")[0];
+}
+
+function addMinutes(time: string, minutes: number) {
+  const [hours = "0", mins = "0"] = time.split(":");
+  const date = new Date();
+  date.setHours(Number(hours), Number(mins), 0, 0);
+  date.setMinutes(date.getMinutes() + minutes);
+
+  return `${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`;
+}
+
+function getScheduleDuration(schedule: BackendClassSchedule, fallback: number) {
+  const duration = Number.parseInt(schedule.class?.duration || "", 10);
+  return Number.isFinite(duration) ? duration : fallback;
+}
+
+export function mapScheduleToTimeSlot(
+  schedule: BackendClassSchedule,
+  fallbackDuration: number,
+): TimeSlot {
+  const duration = getScheduleDuration(schedule, fallbackDuration);
+  const spacesAvailable = schedule.spaces_available ?? null;
+
+  return {
+    id: schedule.id,
+    label: `${schedule.time} - ${schedule.class?.name || "Clase"}`,
+    startTime: schedule.time,
+    endTime: addMinutes(schedule.time, duration),
+    available: schedule.isActive && (spacesAvailable === null || spacesAvailable > 0),
+    className: schedule.class?.name || "Clase de español",
+    teacherName: schedule.teacher?.name || schedule.coach?.name || "Profesor por asignar",
+    spacesAvailable,
+  };
+}
+
+export async function getClassSchedules(
+  token: string,
+): Promise<BackendClassSchedule[]> {
+  return apiClient<BackendClassSchedule[]>("/class-schedules", {
+    method: "GET",
+    token,
+    cache: "no-store",
+  });
+}
 
 export async function getAvailableSlots(
   params: GetAvailableSlotsParams,
+  token: string,
 ): Promise<TimeSlot[]> {
-  /**
-   * Cuando conectes backend:
-   *
-   * const response = await fetch(
-   *   `${API_URL}/bookings/available-slots?date=${params.date}&duration=${params.duration}&timezone=${params.timezone}`,
-   *   { method: "GET", cache: "no-store" }
-   * );
-   *
-   * if (!response.ok) throw new Error("Error loading slots");
-   * return response.json();
-   */
+  const schedules = await getClassSchedules(token);
 
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  return schedules
+    .filter((schedule) => {
+      const scheduleDate = normalizeDate(schedule.date);
+      const duration = getScheduleDuration(schedule, params.duration);
 
-  return mockAvailableSlots.filter((slot) => slot.available);
+      return (
+        schedule.isActive &&
+        scheduleDate === params.date &&
+        (!params.duration || duration === params.duration)
+      );
+    })
+    .map((schedule) => mapScheduleToTimeSlot(schedule, params.duration));
 }
 
-export async function createBooking(
-  payload: BookingPayload,
-): Promise<BookingResponse> {
-  /**
-   * Cuando conectes backend:
-   *
-   * const response = await fetch(`${API_URL}/bookings`, {
-   *   method: "POST",
-   *   headers: {
-   *     "Content-Type": "application/json",
-   *   },
-   *   body: JSON.stringify(payload),
-   * });
-   *
-   * if (!response.ok) throw new Error("Error creating booking");
-   * return response.json();
-   */
+export async function createReservation(
+  classScheduleId: string,
+  token: string,
+): Promise<CreateReservationResponse> {
+  return apiClient<CreateReservationResponse>(
+    `/reservations?classScheduleId=${encodeURIComponent(classScheduleId)}`,
+    {
+      method: "POST",
+      token,
+    },
+  );
+}
 
-  console.log("Booking payload listo para backend:", payload);
+export async function getMyReservations(
+  token: string,
+): Promise<BackendReservation[]> {
+  return apiClient<BackendReservation[]>("/reservations/me", {
+    method: "GET",
+    token,
+    cache: "no-store",
+  });
+}
 
-  await new Promise((resolve) => setTimeout(resolve, 700));
-
-  return {
-    success: true,
-    bookingId: `BOOK-${Date.now()}`,
-    message: "Reserva creada correctamente",
-  };
+export async function getTeacherReservations(
+  token: string,
+): Promise<BackendTeacherReservation[]> {
+  return apiClient<BackendTeacherReservation[]>("/reservations/teacher/me", {
+    method: "GET",
+    token,
+    cache: "no-store",
+  });
 }

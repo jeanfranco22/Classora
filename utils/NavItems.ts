@@ -6,6 +6,7 @@ export const navItems: NavItem[] = [
 
   { label: "Lecciones", href: "/lessons", position: "center" },
   { label: "Reservas", href: "/booking", position: "center" },
+  { label: "Panel docente", href: "/teacher", position: "center" },
 
   { label: "Iniciar Sesion", href: "/login", position: "right" },
   { label: "Registro", href: "/register", position: "right" },
