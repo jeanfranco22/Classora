@@ -50,3 +50,42 @@ export interface BookingResponse {
   bookingId: string;
   message: string;
 }
+
+export interface BackendClassSchedule {
+  id: string;
+  date: string;
+  time: string;
+  token: number;
+  isActive: boolean;
+  spaces_available?: number;
+  class?: {
+    id: string;
+    name: string;
+    duration?: string;
+    capacity?: number;
+    intensity?: string;
+  };
+  teacher?: {
+    id: string;
+    name: string;
+    email?: string;
+  };
+  coach?: {
+    id: string;
+    name: string;
+    email?: string;
+  };
+}
+
+export interface BackendReservation {
+  id: string;
+  date: string;
+  status: string;
+  class_schedule?: BackendClassSchedule;
+}
+
+export interface CreateReservationResponse {
+  success: boolean;
+  message: string;
+  reservation_id: string;
+}

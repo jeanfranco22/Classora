@@ -27,6 +27,7 @@ export interface AuthContextType {
   };
   register: (payload: RegisterPayload) => Promise<void>;
   login: (payload: LoginPayload) => Promise<void>;
+  getCurrentUser: () => Promise<User | null>;
   logout: () => void;
   loading: boolean;
 }

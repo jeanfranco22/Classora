@@ -6,8 +6,12 @@ import {
   LoginPayload,
   RegisterPayload,
 } from "../../Interface/AuthInterface";
-import { DataUser } from "../../Interface/UserInterface";
-import { loginUser, registerUser } from "../services/AuthServices";
+import { DataUser, User } from "../../Interface/UserInterface";
+import {
+  getCurrentUser as fetchCurrentUser,
+  loginUser,
+  registerUser,
+} from "../services/AuthServices";
 
 export const AuthContext = createContext<AuthContextType | undefined>(
   undefined,
@@ -24,6 +28,30 @@ const STORAGE_KEY = "auth_session";
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [dataUser, setDataUser] = useState<DataUser>(initialDataUser);
   const [loading, setLoading] = useState(false);
+
+  const saveSession = (token: string, user: User | null) => {
+    const session: DataUser = {
+      user,
+      token,
+      isAuthenticated: Boolean(token && user),
+    };
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    setDataUser(session);
+  };
+
+  const logout = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setDataUser(initialDataUser);
+  };
+
+  const getCurrentUser = async () => {
+    if (!dataUser.token) return null;
+
+    const user = await fetchCurrentUser(dataUser.token);
+    saveSession(dataUser.token, user);
+    return user;
+  };
 
   useEffect(() => {
     const storedSession = localStorage.getItem(STORAGE_KEY);
@@ -48,17 +76,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const saveSession = (token: string, user: DataUser["user"]) => {
-    const session: DataUser = {
-      user,
-      token,
-      isAuthenticated: true,
-    };
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-    setDataUser(session);
-  };
-
   const register = async (payload: RegisterPayload) => {
     setLoading(true);
 
@@ -81,16 +98,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem(STORAGE_KEY);
-    setDataUser(initialDataUser);
-  };
-
   const value = useMemo<AuthContextType>(
     () => ({
       dataUser,
       register,
       login,
+      getCurrentUser,
       logout,
       loading,
     }),
