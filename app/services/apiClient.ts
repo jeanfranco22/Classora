@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const RAILWAY_API_URL = "https://classora-server-production.up.railway.app";
 
 export class ApiError extends Error {
   status: number;
@@ -18,18 +18,26 @@ type ApiRequestOptions = Omit<RequestInit, "body" | "headers"> & {
   headers?: HeadersInit;
 };
 
-function getApiUrl(path: string) {
-  if (!API_URL) {
+function getApiBaseUrl() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+  if (!apiUrl) {
     throw new ApiError(
-      "NEXT_PUBLIC_API_URL is not configured",
+      `NEXT_PUBLIC_API_URL no está configurada. Define NEXT_PUBLIC_API_URL=${RAILWAY_API_URL} en .env.local y en Vercel.`,
       0,
     );
   }
 
-  return `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  return apiUrl.replace(/\/$/, "");
+}
+
+function getApiUrl(path: string) {
+  return `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 async function parseResponse(response: Response) {
+  if (response.status === 204) return null;
+
   const contentType = response.headers.get("content-type") || "";
 
   if (!contentType.includes("application/json")) {
@@ -55,15 +63,16 @@ export async function apiClient<T>(
   options: ApiRequestOptions = {},
 ): Promise<T> {
   const { body, token, headers, ...requestOptions } = options;
+  const hasBody = body !== undefined;
 
   const response = await fetch(getApiUrl(path), {
     ...requestOptions,
     headers: {
-      "Content-Type": "application/json",
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: hasBody ? JSON.stringify(body) : undefined,
   });
 
   const payload = await parseResponse(response);

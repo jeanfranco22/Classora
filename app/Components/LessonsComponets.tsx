@@ -49,7 +49,18 @@ const LessonCard = ({ lesson }: { lesson: Lesson }) => {
 };
 
 const LessonsComponent = async () => {
-  const lessons = await getLessons();
+  let lessons: Lesson[] = [];
+  let error = "";
+
+  try {
+    lessons = await getLessons();
+  } catch (err) {
+    console.error(err);
+    error =
+      err instanceof Error
+        ? err.message
+        : "No se pudieron cargar las clases desde Classora.";
+  }
 
   return (
     <section className="relative min-h-screen overflow-hidden bg-[#f7f7f5] text-[#1f2a44]">
@@ -87,11 +98,21 @@ const LessonsComponent = async () => {
           </span>
         </div>
 
-        <div className="mt-16 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {lessons.map((lesson) => (
-            <LessonCard key={lesson.id} lesson={lesson} />
-          ))}
-        </div>
+        {error ? (
+          <div className="mt-16 rounded-[28px] border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
+            {error}
+          </div>
+        ) : lessons.length === 0 ? (
+          <div className="mt-16 rounded-[28px] border border-[#d9dde7] bg-white/80 p-6 text-center text-sm text-[#667085]">
+            No hay clases disponibles por ahora.
+          </div>
+        ) : (
+          <div className="mt-16 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {lessons.map((lesson) => (
+              <LessonCard key={lesson.id} lesson={lesson} />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
