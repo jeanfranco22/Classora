@@ -16,7 +16,7 @@ export interface AuthResponse {
   success: boolean;
   message: string;
   token: string;
-  user: User;
+  user: User | null;
 }
 
 export interface AuthContextType {
@@ -30,4 +30,5 @@ export interface AuthContextType {
   getCurrentUser: () => Promise<User | null>;
   logout: () => void;
   loading: boolean;
+  error: string | null;
 }

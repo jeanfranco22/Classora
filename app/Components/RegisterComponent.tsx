@@ -68,7 +68,9 @@ export function RegisterComponent() {
       }, 1000);
     } catch (err) {
       console.error(err);
-      setError("No se pudo completar el registro.");
+      setError(
+        err instanceof Error ? err.message : "No se pudo completar el registro.",
+      );
     }
   };
 

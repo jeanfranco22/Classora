@@ -18,4 +18,5 @@ export interface BackendClass {
   benefits?: string[] | null;
   imgUrl?: string | null;
   intensity?: "alta" | "media" | "baja" | string;
+  price?: string | number | null;
 }

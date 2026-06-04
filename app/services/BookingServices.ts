@@ -8,6 +8,19 @@ import {
 } from "../../Interface/BookingInterface";
 import { apiClient } from "./apiClient";
 
+interface BackendCreateReservationResponse {
+  success?: boolean;
+  message?: string;
+  reservation_id?: string;
+  reservationId?: string;
+  id?: string;
+  reservation?: {
+    id?: string;
+    reservation_id?: string;
+    reservationId?: string;
+  };
+}
+
 function normalizeDate(date: string) {
   return date?.split("T")[0];
 }
@@ -28,21 +41,47 @@ function getScheduleDuration(schedule: BackendClassSchedule, fallback: number) {
   return Number.isFinite(duration) ? duration : fallback;
 }
 
+function normalizeSchedule(schedule: BackendClassSchedule): BackendClassSchedule {
+  return {
+    ...schedule,
+    spaces_available: schedule.spaces_available ?? schedule.spacesAvailable,
+    isActive: schedule.isActive ?? true,
+  };
+}
+
+function normalizeReservation<T extends BackendReservation | BackendTeacherReservation>(
+  reservation: T,
+): T {
+  return {
+    ...reservation,
+    class_schedule: reservation.class_schedule ?? reservation.classSchedule,
+    ...("users" in reservation || "user" in reservation
+      ? { users: reservation.users ?? reservation.user }
+      : {}),
+  };
+}
+
 export function mapScheduleToTimeSlot(
   schedule: BackendClassSchedule,
   fallbackDuration: number,
 ): TimeSlot {
-  const duration = getScheduleDuration(schedule, fallbackDuration);
-  const spacesAvailable = schedule.spaces_available ?? null;
+  const normalizedSchedule = normalizeSchedule(schedule);
+  const duration = getScheduleDuration(normalizedSchedule, fallbackDuration);
+  const spacesAvailable = normalizedSchedule.spaces_available ?? null;
 
   return {
-    id: schedule.id,
-    label: `${schedule.time} - ${schedule.class?.name || "Clase"}`,
-    startTime: schedule.time,
-    endTime: addMinutes(schedule.time, duration),
-    available: schedule.isActive && (spacesAvailable === null || spacesAvailable > 0),
-    className: schedule.class?.name || "Clase de español",
-    teacherName: schedule.teacher?.name || schedule.coach?.name || "Profesor por asignar",
+    id: normalizedSchedule.id,
+    label: `${normalizedSchedule.time} - ${normalizedSchedule.class?.name || "Clase"}`,
+    startTime: normalizedSchedule.time,
+    endTime: addMinutes(normalizedSchedule.time, duration),
+    available:
+      normalizedSchedule.isActive &&
+      (spacesAvailable === null || spacesAvailable > 0),
+    className: normalizedSchedule.class?.name || "Clase de español",
+    teacherName:
+      normalizedSchedule.teacher?.name ||
+      normalizedSchedule.coach?.name ||
+      "Profesor por asignar",
     spacesAvailable,
   };
 }
@@ -50,11 +89,13 @@ export function mapScheduleToTimeSlot(
 export async function getClassSchedules(
   token: string,
 ): Promise<BackendClassSchedule[]> {
-  return apiClient<BackendClassSchedule[]>("/class-schedules", {
+  const schedules = await apiClient<BackendClassSchedule[]>("/class-schedules", {
     method: "GET",
     token,
     cache: "no-store",
   });
+
+  return schedules.map(normalizeSchedule);
 }
 
 export async function getAvailableSlots(
@@ -81,31 +122,54 @@ export async function createReservation(
   classScheduleId: string,
   token: string,
 ): Promise<CreateReservationResponse> {
-  return apiClient<CreateReservationResponse>(
-    `/reservations?classScheduleId=${encodeURIComponent(classScheduleId)}`,
+  const response = await apiClient<BackendCreateReservationResponse>(
+    "/reservation/reserve",
     {
       method: "POST",
       token,
+      body: { classScheduleId },
     },
   );
+
+  const reservationId =
+    response.reservation_id ||
+    response.reservationId ||
+    response.id ||
+    response.reservation?.reservation_id ||
+    response.reservation?.reservationId ||
+    response.reservation?.id ||
+    classScheduleId;
+
+  return {
+    success: response.success ?? true,
+    message: response.message || "Reserva creada correctamente.",
+    reservation_id: reservationId,
+  };
 }
 
 export async function getMyReservations(
   token: string,
 ): Promise<BackendReservation[]> {
-  return apiClient<BackendReservation[]>("/reservations/me", {
+  const reservations = await apiClient<BackendReservation[]>("/reservations/me", {
     method: "GET",
     token,
     cache: "no-store",
   });
+
+  return reservations.map(normalizeReservation);
 }
 
 export async function getTeacherReservations(
   token: string,
 ): Promise<BackendTeacherReservation[]> {
-  return apiClient<BackendTeacherReservation[]>("/reservations/teacher/me", {
-    method: "GET",
-    token,
-    cache: "no-store",
-  });
+  const reservations = await apiClient<BackendTeacherReservation[]>(
+    "/reservations/teacher/me",
+    {
+      method: "GET",
+      token,
+      cache: "no-store",
+    },
+  );
+
+  return reservations.map(normalizeReservation);
 }
