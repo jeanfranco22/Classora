@@ -9,6 +9,21 @@ export interface User {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  isProfileComplete?: boolean;
+}
+
+export interface BackendUser {
+  id: string;
+  name?: string;
+  fullName?: string;
+  email: string;
+  role: string;
+  profileImg?: string | null;
+  avatar?: string | null;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  isProfileComplete?: boolean;
 }
 
 export interface DataUser {

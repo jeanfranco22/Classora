@@ -24,6 +24,9 @@ export interface TimeSlot {
   startTime: string;
   endTime: string;
   available: boolean;
+  className: string;
+  teacherName: string;
+  spacesAvailable: number | null;
 }
 
 export interface GetAvailableSlotsParams {
@@ -32,21 +35,62 @@ export interface GetAvailableSlotsParams {
   timezone: string;
 }
 
-export interface BookingPayload {
-  studentName: string;
-  studentEmail: string;
+export interface BackendClassSchedule {
+  id: string;
   date: string;
-  startTime: string;
-  endTime: string;
-  lessonType: LessonType;
-  level: LessonLevel;
-  duration: number;
-  timezone: string;
-  notes?: string;
+  time: string;
+  token: number;
+  isActive: boolean;
+  spaces_available?: number;
+  spacesAvailable?: number;
+  class?: {
+    id: string;
+    name: string;
+    duration?: string;
+    capacity?: number;
+    intensity?: string;
+  };
+  teacher?: {
+    id: string;
+    name: string;
+    email?: string;
+  };
+  coach?: {
+    id: string;
+    name: string;
+    email?: string;
+  };
 }
 
-export interface BookingResponse {
+export interface BackendReservation {
+  id: string;
+  date: string;
+  status: string;
+  class_schedule?: BackendClassSchedule;
+  classSchedule?: BackendClassSchedule;
+}
+
+export interface CreateReservationResponse {
   success: boolean;
-  bookingId: string;
   message: string;
+  reservation_id: string;
+  reservationId?: string;
+}
+
+export interface BackendTeacherReservation {
+  id: string;
+  date: string;
+  status: string;
+  users?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  class_schedule?: BackendClassSchedule;
+  classSchedule?: BackendClassSchedule;
 }

@@ -16,7 +16,7 @@ export interface AuthResponse {
   success: boolean;
   message: string;
   token: string;
-  user: User;
+  user: User | null;
 }
 
 export interface AuthContextType {
@@ -27,6 +27,8 @@ export interface AuthContextType {
   };
   register: (payload: RegisterPayload) => Promise<void>;
   login: (payload: LoginPayload) => Promise<void>;
+  getCurrentUser: () => Promise<User | null>;
   logout: () => void;
   loading: boolean;
+  error: string | null;
 }
