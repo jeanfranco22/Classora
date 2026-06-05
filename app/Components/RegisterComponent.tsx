@@ -64,7 +64,7 @@ export function RegisterComponent() {
       setForm(initialForm);
 
       setTimeout(() => {
-        router.push("/booking");
+        router.push("/dashboard");
       }, 1000);
     } catch (err) {
       console.error(err);
