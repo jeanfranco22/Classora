@@ -66,13 +66,27 @@ function mapAuthResponse(response: BackendAuthResponse): AuthResponse {
 export async function registerUser(
   payload: RegisterPayload,
 ): Promise<AuthResponse> {
+  const registerPayload = {
+    fullName: payload.fullName,
+    name: payload.fullName,
+    email: payload.email,
+    password: payload.password,
+    confirmPassword: payload.confirmPassword,
+  };
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log("Register payload check:", {
+      keys: Object.keys(registerPayload),
+      hasPassword: Boolean(registerPayload.password),
+      hasConfirmPassword: Boolean(registerPayload.confirmPassword),
+      passwordsMatch:
+        registerPayload.password === registerPayload.confirmPassword,
+    });
+  }
+
   const response = await apiClient<BackendAuthResponse>("/auth/register", {
     method: "POST",
-    body: {
-      name: payload.fullName.trim(),
-      email: payload.email.trim(),
-      password: payload.password,
-    },
+    body: registerPayload,
   });
 
   return mapAuthResponse(response);
