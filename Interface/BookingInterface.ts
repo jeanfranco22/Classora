@@ -42,6 +42,7 @@ export interface BackendClassSchedule {
   token: number;
   isActive: boolean;
   spaces_available?: number;
+  spacesAvailable?: number;
   class?: {
     id: string;
     name: string;
@@ -66,12 +67,14 @@ export interface BackendReservation {
   date: string;
   status: string;
   class_schedule?: BackendClassSchedule;
+  classSchedule?: BackendClassSchedule;
 }
 
 export interface CreateReservationResponse {
   success: boolean;
   message: string;
   reservation_id: string;
+  reservationId?: string;
 }
 
 export interface BackendTeacherReservation {
@@ -83,5 +86,11 @@ export interface BackendTeacherReservation {
     name: string;
     email: string;
   };
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  };
   class_schedule?: BackendClassSchedule;
+  classSchedule?: BackendClassSchedule;
 }

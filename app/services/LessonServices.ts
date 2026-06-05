@@ -1,8 +1,5 @@
 import { BackendClass, Lesson } from "../../Interface/LessonInterface";
-import { lessonsData } from "../../utils/LessonData";
 import { apiClient } from "./apiClient";
-
-const TEMPORARY_PRICE_FALLBACK = "$18 USD";
 
 function mapIntensityToLevel(intensity?: string): Lesson["level"] {
   if (intensity === "alta") return "Avanzado";
@@ -12,6 +9,13 @@ function mapIntensityToLevel(intensity?: string): Lesson["level"] {
   return "Todos";
 }
 
+function formatPrice(price: BackendClass["price"]) {
+  if (price === null || price === undefined || price === "") return "Consultar";
+  if (typeof price === "number") return `$${price}`;
+
+  return price;
+}
+
 function mapClassToLesson(classItem: BackendClass): Lesson {
   return {
     id: classItem.id,
@@ -19,25 +23,18 @@ function mapClassToLesson(classItem: BackendClass): Lesson {
     description: classItem.description || "Clase personalizada de español.",
     level: mapIntensityToLevel(classItem.intensity),
     duration: classItem.duration,
-    price: TEMPORARY_PRICE_FALLBACK,
+    price: formatPrice(classItem.price),
     href: "/booking",
-    focus: classItem.benefits?.length ? classItem.benefits : ["Español", "Práctica", "Aprendizaje"],
+    focus: classItem.benefits?.length ? classItem.benefits : [],
     image: classItem.imgUrl ?? null,
   };
 }
 
 export async function getLessons(): Promise<Lesson[]> {
-  try {
-    const classes = await apiClient<BackendClass[]>("/classes", {
-      method: "GET",
-      cache: "no-store",
-    });
+  const classes = await apiClient<BackendClass[]>("/classes", {
+    method: "GET",
+    cache: "no-store",
+  });
 
-    if (!classes.length) return lessonsData;
-
-    return classes.map(mapClassToLesson);
-  } catch (error) {
-    console.error("Error loading backend classes, using local lesson fallback:", error);
-    return lessonsData;
-  }
+  return classes.map(mapClassToLesson);
 }

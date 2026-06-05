@@ -50,7 +50,9 @@ export function LoginComponent() {
       router.push("/booking");
     } catch (err) {
       console.error(err);
-      setError("No se pudo iniciar sesión.");
+      setError(
+        err instanceof Error ? err.message : "No se pudo iniciar sesión.",
+      );
     }
   };
 

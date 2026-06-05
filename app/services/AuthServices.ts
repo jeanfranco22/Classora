@@ -4,11 +4,14 @@ import {
   RegisterPayload,
 } from "../../Interface/AuthInterface";
 import { BackendUser, User, UserRole } from "../../Interface/UserInterface";
-import { apiClient } from "./apiClient";
+import { ApiError, apiClient } from "./apiClient";
 
 interface BackendAuthResponse {
-  accessToken: string;
-  user: BackendUser;
+  accessToken?: string;
+  access_token?: string;
+  token?: string;
+  message?: string;
+  user?: BackendUser;
 }
 
 function mapRole(role: string): UserRole {
@@ -37,12 +40,26 @@ export function mapBackendUser(user: BackendUser): User {
   };
 }
 
+function getAuthToken(response: BackendAuthResponse) {
+  return response.accessToken || response.access_token || response.token || "";
+}
+
 function mapAuthResponse(response: BackendAuthResponse): AuthResponse {
+  const token = getAuthToken(response);
+
+  if (!token) {
+    throw new ApiError(
+      "El backend no devolvió un token de autenticación.",
+      0,
+      response,
+    );
+  }
+
   return {
     success: true,
-    message: "Autenticación exitosa",
-    token: response.accessToken,
-    user: mapBackendUser(response.user),
+    message: response.message || "Autenticación exitosa",
+    token,
+    user: response.user ? mapBackendUser(response.user) : null,
   };
 }
 
@@ -78,7 +95,10 @@ export async function registerUser(
 export async function loginUser(payload: LoginPayload): Promise<AuthResponse> {
   const response = await apiClient<BackendAuthResponse>("/auth/login", {
     method: "POST",
-    body: payload,
+    body: {
+      email: payload.email.trim(),
+      password: payload.password,
+    },
   });
 
   return mapAuthResponse(response);
