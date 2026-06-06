@@ -29,6 +29,7 @@ export interface AuthContextType {
   login: (payload: LoginPayload) => Promise<void>;
   getCurrentUser: () => Promise<User | null>;
   logout: () => void;
+  initializing: boolean;
   loading: boolean;
   error: string | null;
 }
