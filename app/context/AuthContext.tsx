@@ -27,6 +27,7 @@ const STORAGE_KEY = "auth_session";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [dataUser, setDataUser] = useState<DataUser>(initialDataUser);
+  const [initializing, setInitializing] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const session: DataUser = {
       user,
       token,
-      isAuthenticated: Boolean(token && user),
+      isAuthenticated: Boolean(token),
     };
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
@@ -47,52 +48,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
   }, []);
 
-  const getCurrentUser = useCallback(async () => {
-    if (!dataUser.token) return null;
+  const getCurrentUser = useCallback(
+    async (sessionToken = dataUser.token) => {
+      if (!sessionToken) return null;
 
-    const user = await fetchCurrentUser(dataUser.token);
-    saveSession(dataUser.token, user);
-    return user;
-  }, [dataUser.token, saveSession]);
+      const user = await fetchCurrentUser(sessionToken);
+      saveSession(sessionToken, user);
+      return user;
+    },
+    [dataUser.token, saveSession],
+  );
 
   useEffect(() => {
     const storedSession = localStorage.getItem(STORAGE_KEY);
 
-    if (!storedSession) return;
+    if (!storedSession) {
+      setInitializing(false);
+      return;
+    }
 
     let cancelled = false;
 
-    try {
-      const parsedSession: DataUser = JSON.parse(storedSession);
+    const hydrateSession = async () => {
+      try {
+        const parsedSession: DataUser = JSON.parse(storedSession);
 
-      if (parsedSession?.token) {
-        setDataUser({
-          user: parsedSession.user ?? null,
-          token: parsedSession.token,
-          isAuthenticated: Boolean(parsedSession.user),
-        });
-
-        setLoading(true);
-        fetchCurrentUser(parsedSession.token)
-          .then((user) => {
-            if (!cancelled) saveSession(parsedSession.token!, user);
-          })
-          .catch((err) => {
-            console.error("Error refreshing auth session:", err);
-
-            if (!cancelled) logout();
-          })
-          .finally(() => {
-            if (!cancelled) setLoading(false);
+        if (parsedSession?.token) {
+          setDataUser({
+            user: parsedSession.user ?? null,
+            token: parsedSession.token,
+            isAuthenticated: true,
           });
-      } else {
-        localStorage.removeItem(STORAGE_KEY);
-      }
-    } catch (error) {
-      console.error("Error reading auth session:", error);
-      localStorage.removeItem(STORAGE_KEY);
-    }
 
+          setLoading(true);
+          const user = await fetchCurrentUser(parsedSession.token);
+
+          if (!cancelled) saveSession(parsedSession.token, user);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      } catch (error) {
+        console.error("Error reading auth session:", error);
+        if (!cancelled) logout();
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setInitializing(false);
+        }
+      }
+    };
+
+    void hydrateSession();
     return () => {
       cancelled = true;
     };
@@ -141,10 +147,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       getCurrentUser,
       logout,
+      initializing,
       loading,
       error,
     }),
-    [dataUser, error, getCurrentUser, loading, login, logout, register],
+    [
+      dataUser,
+      error,
+      getCurrentUser,
+      initializing,
+      loading,
+      login,
+      logout,
+      register,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -47,7 +47,7 @@ export function LoginComponent() {
 
     try {
       await login(form);
-      router.push("/booking");
+      router.push("/dashboard");
     } catch (err) {
       console.error(err);
       setError(
